@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { TokenIssueErrorResponse, TokenIssueResponse } from "./_lib/types";
 import { saveTokens } from "@/lib/spotify-auth";
+import { getSpotifyAuthUrl } from "@/lib/spotify-login";
 import { toast } from "sonner";
 import {
   Card,
@@ -101,7 +102,7 @@ const CallbackContent = () => {
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => router.replace("/login")}
+              onClick={() => { window.location.href = getSpotifyAuthUrl(); }}
             >
               Try Again
             </Button>
