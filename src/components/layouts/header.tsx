@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { LinkButton } from "../ui/link-button";
 import { Button } from "../ui/button";
+import Link from "next/link";
 
 const SpotifyIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="size-5">
@@ -14,7 +15,9 @@ const SPOTIFY_AUTH_URL = (() => {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: process.env.NEXT_PUBLIC_CLIENT_ID!,
-    scope: "user-read-private user-read-email playlist-read-private playlist-read-collaborative",
+    scope:
+      "user-read-private user-read-email " +
+      "playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public",
     redirect_uri: "http://127.0.0.1:3000/callback",
   });
   return `https://accounts.spotify.com/authorize?${params.toString()}`;
@@ -41,14 +44,12 @@ const Header = ({ isLoggedIn }: HeaderProps) => {
   };
 
   return (
-    <header className="flex items-center justify-between">
-      <h1>Spotify orgonizer</h1>
+    <header className="flex items-center pb-10 justify-between">
+      <Link className="text-2xl font-semibold" href="/">
+        Spotify orgonizer
+      </Link>
       {loggedIn ? (
-        <Button
-          size="lg"
-          variant="outline"
-          onClick={handleLogout}
-        >
+        <Button size="lg" variant="outline" onClick={handleLogout}>
           Logout
         </Button>
       ) : (

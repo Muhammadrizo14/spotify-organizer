@@ -5,6 +5,8 @@ import axios from "axios";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getValidToken } from "@/lib/spotify-auth";
+import { LinkButton } from "@/components/ui/link-button";
+import { CirclePlus } from "lucide-react";
 
 export interface SpotifyUserProfile {
   country: string;
@@ -118,7 +120,14 @@ export default function Home() {
         </p>
       ) : (
         <div className="pt-5">
-          <h2 className="text-2xl font-bold">Welcome {user.display_name}!</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Welcome {user.display_name}!</h2>
+
+            <LinkButton href="/create">
+              <CirclePlus />
+              Create
+            </LinkButton>
+          </div>
 
           <h3 className="text-lg font-semibold mt-6 mb-3">
             Your Playlists ({playlists.length})
@@ -133,12 +142,16 @@ export default function Home() {
                 rel="noopener noreferrer"
               >
                 <Card className="hover:bg-accent transition-colors cursor-pointer h-full">
-                  {playlist.images[0] && (
+                  {playlist.images?.[0] ? (
                     <img
                       src={playlist.images[0].url}
                       alt={playlist.name}
                       className="w-full aspect-square object-cover rounded-t-lg"
                     />
+                  ) : (
+                    <div className="w-full h-full border-b border-b-gray-300 flex items-center justify-center ">
+                      <p className="text-lg">No image was found</p>
+                    </div>
                   )}
                   <CardHeader>
                     <CardTitle className="text-base line-clamp-1">
