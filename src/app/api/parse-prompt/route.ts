@@ -1,7 +1,10 @@
-import { GoogleGenAI } from "@google/genai";
 import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const groq = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: "https://api.groq.com/openai/v1",
+});
 
 const SYSTEM_PROMPT = `You are a music playlist settings parser. Given a user's natural language description of a playlist, extract structured settings as JSON.
 
@@ -29,21 +32,21 @@ If the user doesn't mention mixing in saved music, default source to "new".
 If the user doesn't mention an era, default to ["2010s","2020s"].
 Always output valid JSON only, no markdown fences.`;
 
-function isQuotaError(error: unknown): boolean {
+function isRateLimitError(error: unknown): boolean {
   if (error instanceof Error) {
     const msg = error.message.toLowerCase();
-    return msg.includes("quota") || msg.includes("rate") || msg.includes("429") || msg.includes("resource_exhausted");
+    return msg.includes("rate") || msg.includes("429") || msg.includes("quota") || msg.includes("limit");
   }
   return false;
 }
 
-function extractGeminiError(error: unknown): string {
+function extractError(error: unknown): string {
   if (error instanceof Error) {
-    if (isQuotaError(error)) {
-      return "Gemini API quota exceeded. Please wait a moment and try again.";
+    if (isRateLimitError(error)) {
+      return "Groq API rate limit reached. Please wait a moment and try again.";
     }
-    if (error.message.includes("API_KEY") || error.message.includes("401") || error.message.includes("403")) {
-      return "Gemini API key is invalid or missing.";
+    if (error.message.includes("API key") || error.message.includes("401") || error.message.includes("403")) {
+      return "Groq API key is invalid or missing. Get a free key at console.groq.com.";
     }
     return error.message;
   }
@@ -57,23 +60,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: prompt,
-      config: {
-        systemInstruction: SYSTEM_PROMPT,
-        responseMimeType: "application/json",
-      },
+    const response = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
     });
 
-    const text = response.text ?? "";
+    const text = response.choices[0]?.message?.content ?? "";
     const parsed = JSON.parse(text);
     return NextResponse.json(parsed);
   } catch (error: unknown) {
-    console.error("Gemini parse error:", error);
+    console.error("Groq parse error:", error);
 
-    const message = extractGeminiError(error);
-    const status = isQuotaError(error) ? 429 : 500;
+    const message = extractError(error);
+    const status = isRateLimitError(error) ? 429 : 500;
     return NextResponse.json({ error: message }, { status });
   }
 }
