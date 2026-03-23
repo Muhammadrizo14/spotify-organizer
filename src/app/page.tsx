@@ -108,6 +108,9 @@ export default function Home() {
     fetchData();
   }, []);
 
+
+
+
   return (
     <div className="max-w-[90%] mx-auto p-5">
       <Header />
