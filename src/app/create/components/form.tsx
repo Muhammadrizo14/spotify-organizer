@@ -73,8 +73,17 @@ const CreatePlaylistForm = ({ className }: IProps) => {
       router.push("/");
     } catch (err: unknown) {
       let description = "Something went wrong, try again later.";
-      if (axios.isAxiosError(err) && err.response?.data?.error) {
-        description = err.response.data.error;
+      if (axios.isAxiosError(err)) {
+        const data = err.response?.data as any;
+        const apiError = data?.error;
+
+        if (typeof apiError === "string") {
+          description = apiError;
+        } else if (typeof apiError?.message === "string") {
+          description = apiError.message;
+        } else if (typeof data?.message === "string") {
+          description = data.message;
+        }
       } else if (err instanceof Error) {
         description = err.message;
       }

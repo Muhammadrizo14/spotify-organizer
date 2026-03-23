@@ -85,18 +85,20 @@ test.describe("Create Playlist", () => {
       });
     });
 
-    // Mock Spotify recommendations
+    // Mock Spotify search
     await page.route(
-      "https://api.spotify.com/v1/recommendations*",
+      "https://api.spotify.com/v1/search*",
       (route) => {
         route.fulfill({
           status: 200,
           contentType: "application/json",
           body: JSON.stringify({
-            tracks: [
-              { uri: "spotify:track:1", name: "Track 1", artists: [{ name: "Artist 1" }] },
-              { uri: "spotify:track:2", name: "Track 2", artists: [{ name: "Artist 2" }] },
-            ],
+            tracks: {
+              items: [
+                { uri: "spotify:track:1", name: "Track 1", artists: [{ name: "Artist 1" }] },
+                { uri: "spotify:track:2", name: "Track 2", artists: [{ name: "Artist 2" }] },
+              ],
+            },
           }),
         });
       }
@@ -116,7 +118,7 @@ test.describe("Create Playlist", () => {
 
     // Mock Spotify add-tracks
     await page.route(
-      "https://api.spotify.com/v1/playlists/mock-playlist-id/tracks",
+      "https://api.spotify.com/v1/playlists/mock-playlist-id/items",
       (route) => {
         route.fulfill({
           status: 201,
@@ -146,7 +148,7 @@ test.describe("Create Playlist", () => {
       route.fulfill({
         status: 500,
         contentType: "application/json",
-        body: JSON.stringify({ error: "Gemini API quota exceeded. Please wait a moment and try again." }),
+        body: JSON.stringify({ error: "Groq API rate limit reached. Please wait a moment and try again." }),
       });
     });
 
@@ -161,7 +163,7 @@ test.describe("Create Playlist", () => {
     await page.getByRole("button", { name: /create/i }).click();
 
     await expect(
-      page.getByText("Gemini API quota exceeded. Please wait a moment and try again.")
+      page.getByText("Groq API rate limit reached. Please wait a moment and try again.")
     ).toBeVisible({ timeout: 8000 });
   });
 
@@ -207,7 +209,7 @@ test.describe("Create Playlist", () => {
   }) => {
     await injectAuth(page);
 
-    let recommendationsCalled = false;
+    let searchCalled = false;
     let savedTracksCalled = false;
 
     await page.route("**/api/parse-prompt", (route) => {
@@ -226,13 +228,13 @@ test.describe("Create Playlist", () => {
     });
 
     await page.route(
-      "https://api.spotify.com/v1/recommendations*",
+      "https://api.spotify.com/v1/search*",
       (route) => {
-        recommendationsCalled = true;
+        searchCalled = true;
         route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify({ tracks: [{ uri: "spotify:track:new1", name: "New", artists: [] }] }),
+          body: JSON.stringify({ tracks: { items: [{ uri: "spotify:track:new1", name: "New", artists: [] }] } }),
         });
       }
     );
@@ -259,7 +261,7 @@ test.describe("Create Playlist", () => {
     });
 
     await page.route(
-      "https://api.spotify.com/v1/playlists/pid/tracks",
+      "https://api.spotify.com/v1/playlists/pid/items",
       (route) => {
         route.fulfill({ status: 201, body: JSON.stringify({ snapshot_id: "s" }) });
       }
@@ -277,7 +279,7 @@ test.describe("Create Playlist", () => {
     await page.getByRole("button", { name: /create/i }).click();
 
     await expect(page).toHaveURL("/", { timeout: 10000 });
-    expect(recommendationsCalled).toBe(true);
+    expect(searchCalled).toBe(true);
     expect(savedTracksCalled).toBe(true);
   });
 });

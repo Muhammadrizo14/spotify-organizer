@@ -18,8 +18,10 @@ export interface SpotifyTrack {
   artists: { name: string }[];
 }
 
-export interface SpotifyRecommendationsResponse {
-  tracks: SpotifyTrack[];
+export interface SpotifySearchResponse {
+  tracks: {
+    items: SpotifyTrack[];
+  };
 }
 
 export interface SpotifyLibraryResponse {
