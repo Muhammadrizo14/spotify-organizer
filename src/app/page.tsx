@@ -1,5 +1,19 @@
 "use client";
 
+/**
+ * Home page (/) — Shows the user's Spotify profile and playlists.
+ *
+ * STATES:
+ * 1. Loading  → "Loading..." while fetching data
+ * 2. Logged out → "Log in with Spotify" message (no token in localStorage)
+ * 3. Logged in → Welcome message + grid of user's playlists
+ *
+ * DATA FLOW:
+ * - On mount, getValidToken() checks localStorage for a valid Spotify token
+ * - If token exists, fetches user profile + playlists from Spotify API in parallel
+ * - If any request fails (e.g. expired token), clears tokens → shows login screen
+ */
+
 import Header from "@/components/layouts/header";
 import axios from "axios";
 import { useEffect, useState } from "react";
@@ -7,6 +21,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getValidToken } from "@/lib/spotify-auth";
 import { LinkButton } from "@/components/ui/link-button";
 import { CirclePlus } from "lucide-react";
+
+// ---- Spotify API response types (only fields we use) ----
 
 export interface SpotifyUserProfile {
   country: string;
@@ -50,14 +66,14 @@ interface SpotifyPlaylist {
   public: boolean | null;
   snapshot_id: string;
   items: {
-    total: number;
+    total: number;         // number of tracks in the playlist
   };
   owner: {
     display_name: string | null;
     id: string;
     external_urls: { spotify: string };
   };
-  external_urls: { spotify: string };
+  external_urls: { spotify: string };  // link to open playlist in Spotify
   type: string;
   uri: string;
 }
@@ -72,10 +88,13 @@ export default function Home() {
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Fetch user profile and playlists on page load
   useEffect(() => {
     const fetchData = async () => {
+      // getValidToken() handles token refresh automatically
       const token = await getValidToken();
 
+      // No token → user is not logged in
       if (!token) {
         setLoading(false);
         return;
@@ -84,6 +103,7 @@ export default function Home() {
       const headers = { Authorization: `Bearer ${token}` };
 
       try {
+        // Fetch profile and playlists in parallel for faster loading
         const [userRes, playlistsRes] = await Promise.all([
           axios.get<SpotifyUserProfile>("https://api.spotify.com/v1/me", {
             headers,
@@ -97,6 +117,8 @@ export default function Home() {
         setUser(userRes.data);
         setPlaylists(playlistsRes.data.items);
       } catch {
+        // If fetching fails (e.g. token was invalid despite refresh), clear tokens
+        // so the user sees the login screen instead of a broken state
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         localStorage.removeItem("token_expiry");
@@ -126,6 +148,7 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold">Welcome {user.display_name}!</h2>
 
+            {/* Link to the create playlist page */}
             <LinkButton href="/create">
               <CirclePlus />
               Create
@@ -136,6 +159,7 @@ export default function Home() {
             Your Playlists ({playlists.length})
           </h3>
 
+          {/* Grid of playlist cards — each links to the playlist on Spotify */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {playlists.map((playlist) => (
               <a
