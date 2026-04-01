@@ -1,4 +1,3 @@
-// ---- Types returned by the Groq LLM after parsing the user's prompt ----
 // This is the structured output that the /api/parse-prompt route returns.
 // It drives which Spotify search queries are built in spotify-tracks.service.ts.
 export interface ParsedPromptSettings {

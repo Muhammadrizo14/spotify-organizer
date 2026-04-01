@@ -1,19 +1,5 @@
 "use client";
 
-/**
- * Home page (/) — Shows the user's Spotify profile and playlists.
- *
- * STATES:
- * 1. Loading  → "Loading..." while fetching data
- * 2. Logged out → "Log in with Spotify" message (no token in localStorage)
- * 3. Logged in → Welcome message + grid of user's playlists
- *
- * DATA FLOW:
- * - On mount, getValidToken() checks localStorage for a valid Spotify token
- * - If token exists, fetches user profile + playlists from Spotify API in parallel
- * - If any request fails (e.g. expired token), clears tokens → shows login screen
- */
-
 import Header from "@/components/layouts/header";
 import axios from "axios";
 import { useEffect, useState } from "react";
@@ -129,7 +115,6 @@ export default function Home() {
 
     fetchData();
   }, []);
-
 
 
 

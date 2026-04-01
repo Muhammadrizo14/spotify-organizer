@@ -18,13 +18,7 @@ export async function POST(request: NextRequest) {
     const token = await requestSpotifyToken(
       new URLSearchParams({
         code,
-        redirect_uri: "http://127.0.0.1:3000/callback",
-        // Note: I am not using the following below code because http://127.0.0.1:3000/callback was configrued
-        // as a redirect_uri yet the request.nextUrl.origin is not seing the url http://127.0.0.1:3000
-        // its just making it (request.nextUrl.origin) as localhost
-        // https://github.com/vercel/next.js/issues/31533
-
-        // redirect_uri: getSpotifyRedirectUri(request.nextUrl.origin),
+        redirect_uri: getSpotifyRedirectUri(),
         grant_type: "authorization_code",
       }),
     );

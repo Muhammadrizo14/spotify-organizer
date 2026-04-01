@@ -12,8 +12,14 @@ function getRequiredEnv(name: "NEXT_PUBLIC_CLIENT_ID" | "SPOTIFY_CLIENT_SECRET")
   return value;
 }
 
-export function getSpotifyRedirectUri(origin: string): string {
-  return `${origin}/callback`;
+export function getSpotifyRedirectUri(): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+  if (!appUrl) {
+    throw new Error("Missing required environment variable: NEXT_PUBLIC_APP_URL");
+  }
+
+  return `${appUrl}/callback`;
 }
 
 export function getSpotifyClientId(): string {
