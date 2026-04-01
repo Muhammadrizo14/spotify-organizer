@@ -62,9 +62,9 @@ function buildSearchQueries(settings: ParsedPromptSettings): string[] {
   // For each genre, create two queries: one with genre: filter, one as plain text
   // Plain text helps because Spotify's genre: filter can be restrictive
   for (const genre of settings.genres) {
-    const genreLabel = genre.replace(/-/g, " ");     // "alt-rock" → "alt rock"
-    queries.push(`genre:${genre} ${settings.mood}`);  // e.g. "genre:rock energetic"
-    queries.push(`${genreLabel} ${settings.mood}`);   // e.g. "rock energetic"
+    const genreLabel = genre.replace(/-/g, " "); // "alt-rock" → "alt rock"
+    queries.push(`genre:${genre} ${settings.mood}`); // e.g. "genre:rock energetic"
+    queries.push(`${genreLabel} ${settings.mood}`); // e.g. "rock energetic"
   }
 
   // Add era-based queries to get tracks from specific decades
@@ -75,7 +75,7 @@ function buildSearchQueries(settings: ParsedPromptSettings): string[] {
       for (const era of settings.era.slice(0, 2)) {
         const yearRange = ERA_YEAR_RANGES[era];
         if (yearRange) {
-          queries.push(`${genreLabel} year:${yearRange}`);  // e.g. "rock year:1980-1989"
+          queries.push(`${genreLabel} year:${yearRange}`); // e.g. "rock year:1980-1989"
         }
       }
     }
@@ -97,81 +97,79 @@ function buildSearchQueries(settings: ParsedPromptSettings): string[] {
  * POTENTIAL ISSUES:
  * - If the Spotify token is expired, ALL queries will fail with 401 → throws "session expired"
  * - If queries return overlapping results, the Set deduplicates them.
- *   We over-fetch (limit * 2 / queries) to compensate, but may still get fewer than requested.
+ *   Multiple passes with offset are used to compensate, but may still get fewer than requested.
  * - Individual query failures (e.g. bad query syntax) are caught and logged, not fatal.
+ * - Each Spotify request is capped at 10 results, distributed evenly across queries.
  *
  * @param settings - Parsed prompt settings (genres, mood, era, etc.)
- * @param limit - How many track URIs to return (default 30)
+ * @param trackCount - Exact number of track URIs to return (default 30)
  * @returns Array of Spotify track URI strings, e.g. ["spotify:track:abc123", ...]
  * @throws Error if token is invalid/expired or if 0 tracks were found across all queries
  */
 export async function searchTracks(
   settings: ParsedPromptSettings,
-  limit: number = 30
+  trackCount: number = 30,
 ): Promise<string[]> {
-
-  // Get a valid Spotify access token (auto-refreshes if needed)
   const token = await getValidToken();
   if (!token) throw new Error("Not authenticated");
 
   const queries = buildSearchQueries(settings);
-
-  // Calculate how many tracks to request per query.
-  // We request 2x the limit divided by number of queries to account for
-  // duplicate tracks that appear across multiple queries (the Set deduplicates them).
-  // Minimum 10 per query, maximum 50 (Spotify's limit per request).
-  const perQuery = Math.max(10, Math.ceil((limit * 2) / queries.length));
-
-
-  // Set automatically deduplicates — same track from two queries is stored once
   const allUris = new Set<string>();
 
-  for (const query of queries) {
-    // Stop early if we already have enough unique tracks
-    if (allUris.size >= limit) break;
+  // Distribute trackCount evenly across queries, capped at 10 per request.
+  // e.g. 30 tracks / 4 queries = 8 per query (with remainder spread across first queries)
+  const perQuery = Math.min(Math.ceil(trackCount / queries.length), 10);
 
-    try {
-      const params = new URLSearchParams({
-        q: query,
-        type: "track",
-        limit: String(Math.min(perQuery, 50)),  // Spotify max is 50 per request
-      });
+  // Multiple passes with increasing offset to fill up if deduplication reduces count
+  let offset = 0;
+  const MAX_PASSES = 3;
 
-      const { data } = await axios.get<SpotifySearchResponse>(
-        `${SPOTIFY_BASE}/search?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+  for (let pass = 0; pass < MAX_PASSES && allUris.size < trackCount; pass++) {
+    for (const query of queries) {
+      if (allUris.size >= trackCount) break;
 
-      // Add each track's URI to the set
-      for (const track of data.tracks.items) {
-        allUris.add(track.uri);
+      try {
+        const params = new URLSearchParams({
+          q: query,
+          type: "track",
+          limit: String(perQuery),
+          offset: String(offset),
+        });
+
+        const { data } = await axios.get<SpotifySearchResponse>(
+          `${SPOTIFY_BASE}/search?${params}`,
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
+
+        for (const track of data.tracks.items) {
+          allUris.add(track.uri);
+        }
+      } catch (err) {
+        if (axios.isAxiosError(err) && err.response?.status === 401) {
+          throw new Error("Your session has expired. Please log in again.");
+        }
+        console.warn(`Search query "${query}" failed:`, err);
       }
-    } catch (err) {
-      // 401 means the token is invalid — no point continuing with other queries
-      if (axios.isAxiosError(err) && err.response?.status === 401) {
-        throw new Error("Your session has expired. Please log in again.");
-      }
-      // Other errors (e.g. bad query syntax, rate limit) — log and try next query
-      console.warn(`Search query "${query}" failed:`, err);
     }
+
+    // Next pass starts where this one left off
+    offset += perQuery;
   }
 
-  // If ALL queries returned 0 results, the prompt probably doesn't match any music
   if (allUris.size === 0) {
     throw new Error(
-      "No tracks found for your prompt. Try different keywords or genres."
+      "No tracks found for your prompt. Try different keywords or genres.",
     );
   }
 
-  // Shuffle results so tracks from different queries are interleaved (Fisher-Yates shuffle)
+  // Shuffle (Fisher-Yates) so tracks from different queries are interleaved
   const uris = [...allUris];
   for (let i = uris.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [uris[i], uris[j]] = [uris[j], uris[i]];
   }
 
-  // Return only the requested number of tracks
-  return uris.slice(0, limit);
+  return uris.slice(0, trackCount);
 }
 
 /**
@@ -191,7 +189,8 @@ export async function getSavedTracks(limit: number = 50): Promise<string[]> {
 
   const uris: string[] = [];
   // Start with the first page; Spotify returns a `next` URL for pagination
-  let url: string | null = `${SPOTIFY_BASE}/me/tracks?limit=${Math.min(limit, 50)}`;
+  let url: string | null =
+    `${SPOTIFY_BASE}/me/tracks?limit=${Math.min(limit, 50)}`;
 
   while (url && uris.length < limit) {
     try {
@@ -228,7 +227,7 @@ export async function getSavedTracks(limit: number = 50): Promise<string[]> {
  */
 export async function addTracksToPlaylist(
   playlistId: string,
-  trackUris: string[]
+  trackUris: string[],
 ): Promise<void> {
   const token = await getValidToken();
   if (!token) throw new Error("Not authenticated");
@@ -240,13 +239,13 @@ export async function addTracksToPlaylist(
       await axios.post(
         `${SPOTIFY_BASE}/playlists/${playlistId}/items`,
         { uris: batch },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
     } catch (err) {
       // 403 = user doesn't own the playlist or lacks the right scopes
       if (axios.isAxiosError(err) && err.response?.status === 403) {
         throw new Error(
-          "Spotify returned 403 Forbidden while adding tracks. Make sure you're logged in with `playlist-modify-public`/`playlist-modify-private` scopes and that the playlist is owned by your account (or is collaborative)."
+          "Spotify returned 403 Forbidden while adding tracks. Make sure you're logged in with `playlist-modify-public`/`playlist-modify-private` scopes and that the playlist is owned by your account (or is collaborative).",
         );
       }
       throw err;
@@ -271,32 +270,7 @@ export async function addTracksToPlaylist(
  */
 export async function buildTrackList(
   settings: ParsedPromptSettings,
-  includeSavedMusic: boolean,
-  totalTracks: number = 30
+  totalTracks: number = 30,
 ): Promise<string[]> {
-  // Simple mode: all tracks from search
-  if (!includeSavedMusic) {
-    return searchTracks(settings, totalTracks);
-  }
-
-  // Mixed mode: 60% saved songs, 40% new from search
-  const savedCount = Math.round(totalTracks * 0.6);
-  const newCount = totalTracks - savedCount;
-
-  // Fetch both in parallel for speed
-  const [saved, searched] = await Promise.all([
-    getSavedTracks(savedCount * 3),          // over-fetch 3x to have enough after shuffle + dedup
-    searchTracks(settings, newCount),
-  ]);
-
-  // Remove any saved tracks that also appear in search results (avoid duplicates)
-  const searchedSet = new Set(searched);
-  const dedupedSaved = saved
-    .sort(() => Math.random() - 0.5)           // shuffle saved tracks randomly
-    .filter((uri) => !searchedSet.has(uri))    // remove duplicates
-    .slice(0, savedCount);                     // take only what we need
-
-  // Combine and trim to exact count
-  const combined = [...dedupedSaved, ...searched];
-  return combined.slice(0, totalTracks);
+  return searchTracks(settings, totalTracks);
 }

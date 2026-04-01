@@ -12,17 +12,11 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import * as z from "zod";
 import { createPlaylist } from "../services/playlist-create.service";
-import { addTracksToPlaylist, buildTrackList } from "../services/spotify-tracks.service";
+import {
+  addTracksToPlaylist,
+  buildTrackList,
+} from "../services/spotify-tracks.service";
 
-/**
- * Zod schema for form validation.
- * - name: required, at least 1 character
- * - description: optional text for the playlist description
- * - prompt: optional natural language prompt (e.g. "chill 90s hip-hop")
- *           → sent to /api/parse-prompt to extract genre/mood/era settings
- * - includeSavedMusic: if true, 60% of tracks come from user's liked songs
- * - trackCount: number between 10-50, converted from string via valueAsNumber on the input
- */
 const PlaylistScheme = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
@@ -37,28 +31,6 @@ interface IProps {
   className?: string;
 }
 
-/**
- * CreatePlaylistForm — The main form for creating a Spotify playlist.
- *
- * SUBMISSION FLOW (onSubmit):
- * ┌─────────────────────────────────────────────────────────────────────┐
- * │ 1. If prompt is provided:                                         │
- * │    a) POST /api/parse-prompt → Groq LLM extracts settings (JSON)  │
- * │    b) buildTrackList() → searches Spotify for matching tracks      │
- * │                                                                    │
- * │ 2. createPlaylist() → creates empty playlist on Spotify            │
- * │                                                                    │
- * │ 3. If tracks were found:                                          │
- * │    addTracksToPlaylist() → adds track URIs to the playlist         │
- * │                                                                    │
- * │ 4. Show success toast → redirect to home page                     │
- * └─────────────────────────────────────────────────────────────────────┘
- *
- * ERROR HANDLING:
- * - Axios errors (API responses): extracts error message from response body
- * - Regular errors (e.g. "Not authenticated"): shows error.message
- * - All errors are shown as a toast notification
- */
 const CreatePlaylistForm = ({ className }: IProps) => {
   const router = useRouter();
 
@@ -85,33 +57,35 @@ const CreatePlaylistForm = ({ className }: IProps) => {
         const res = await axios.post<ParsedPromptSettings>("/api/parse-prompt", {
           prompt: data.prompt,
         });
-        const settings = res.data;
+        const settings: ParsedPromptSettings = res.data
 
         // Use the parsed settings to search Spotify for matching tracks
         // This calls searchTracks() and optionally getSavedTracks()
         toast.info("Finding tracks...");
-        trackUris = await buildTrackList(settings, data.includeSavedMusic, data.trackCount);
+
+
+        trackUris = await buildTrackList(settings, data.trackCount);
+
+        // STEP 2: Create the playlist on Spotify (initially empty)
+        toast.info("Creating playlist...");
+        const playlist = await createPlaylist({
+          name: data.name,
+          description: data.description,
+        });
+
+        // STEP 3: Add the found tracks to the playlist (if any)
+        if (trackUris.length > 0) {
+          toast.info(`Adding ${trackUris.length} tracks...`);
+          await addTracksToPlaylist(playlist.id, trackUris);
+        }
+
+        // STEP 4: Success! Show toast and redirect to home page
+        toast.success("Playlist created!", {
+          description: `"${data.name}"${trackUris.length > 0 ? ` with ${trackUris.length} tracks` : ""}.`,
+          richColors: true,
+        });
+        router.push("/");
       }
-
-      // STEP 2: Create the playlist on Spotify (initially empty)
-      toast.info("Creating playlist...");
-      const playlist = await createPlaylist({
-        name: data.name,
-        description: data.description,
-      });
-
-      // STEP 3: Add the found tracks to the playlist (if any)
-      if (trackUris.length > 0) {
-        toast.info(`Adding ${trackUris.length} tracks...`);
-        await addTracksToPlaylist(playlist.id, trackUris);
-      }
-
-      // STEP 4: Success! Show toast and redirect to home page
-      toast.success("Playlist created!", {
-        description: `"${data.name}"${trackUris.length > 0 ? ` with ${trackUris.length} tracks` : ""}.`,
-        richColors: true,
-      });
-      router.push("/");
     } catch (err: unknown) {
       // Extract a user-friendly error message from whatever went wrong
       let description = "Something went wrong, try again later.";
@@ -121,7 +95,7 @@ const CreatePlaylistForm = ({ className }: IProps) => {
         const apiError = data?.error;
 
         if (typeof apiError === "string") {
-          description = apiError;                   // e.g. "Groq API rate limit reached"
+          description = apiError; // e.g. "Groq API rate limit reached"
         } else if (typeof apiError?.message === "string") {
           description = apiError.message;
         } else if (typeof data?.message === "string") {
