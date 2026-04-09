@@ -3,10 +3,11 @@
  *
  * OVERALL FLOW (called from form.tsx → onSubmit):
  * 1. buildTrackList() is the main entry point
- * 2. It decides whether to use only search results or mix in saved/liked songs
+ * 2. It decides whether to use only search results or the user's saved library
  * 3. searchTracks() queries Spotify's search API with genre/mood/era combinations
- * 4. getSavedTracks() fetches the user's liked songs from their library
- * 5. addTracksToPlaylist() sends the final track URIs to the created playlist
+ * 4. fetchAllSavedTracks() paginates through ALL of the user's liked songs
+ * 5. filterSavedTracksBySettings() narrows them to genre/era matches
+ * 6. addTracksToPlaylist() sends the final track URIs to the created playlist
  *
  * DEBUGGING TIPS:
  * - If you get "Your session has expired" → the Spotify token is invalid, user needs to log in again
@@ -21,6 +22,7 @@ import {
   ParsedPromptSettings,
   SpotifySearchResponse,
   SpotifyLibraryResponse,
+  SpotifyTrack,
 } from "@/types/playlist";
 
 const SPOTIFY_BASE = "https://api.spotify.com/v1";
@@ -173,35 +175,31 @@ export async function searchTracks(
 }
 
 /**
- * Fetches the user's saved/liked songs from their Spotify library.
- * Used when "Include my saved music" is toggled on.
+ * Fetches EVERY saved/liked track from the user's Spotify library by paginating
+ * through all pages (50 tracks per page) until there are no more.
  *
- * Spotify paginates results (max 50 per page), so this loops through pages
- * until we have enough tracks or there are no more pages.
+ * Returns full track objects (not just URIs) so callers can inspect artist IDs,
+ * release dates, etc. for filtering.
  *
- * @param limit - Maximum number of saved track URIs to return
- * @returns Array of track URIs from the user's library
+ * @returns All saved SpotifyTrack objects
  * @throws Error if not authenticated or if token is expired (401)
  */
-export async function getSavedTracks(limit: number = 50): Promise<string[]> {
+export async function fetchAllSavedTracks(): Promise<SpotifyTrack[]> {
   const token = await getValidToken();
   if (!token) throw new Error("Not authenticated");
 
-  const uris: string[] = [];
-  // Start with the first page; Spotify returns a `next` URL for pagination
-  let url: string | null =
-    `${SPOTIFY_BASE}/me/tracks?limit=${Math.min(limit, 50)}`;
+  const tracks: SpotifyTrack[] = [];
+  let url: string | null = `${SPOTIFY_BASE}/me/tracks?limit=50`;
 
-  while (url && uris.length < limit) {
+  while (url) {
     try {
       const response = await axios.get<SpotifyLibraryResponse>(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const page: SpotifyLibraryResponse = response.data;
       for (const item of page.items) {
-        uris.push(item.track.uri);
+        tracks.push(item.track);
       }
-      // `page.next` is the URL for the next page, or null if this was the last page
       url = page.next;
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 401) {
@@ -211,7 +209,125 @@ export async function getSavedTracks(limit: number = 50): Promise<string[]> {
     }
   }
 
-  return uris.slice(0, limit);
+  return tracks;
+}
+
+/**
+ * Fetches genres for all given artist IDs via our server-side API route.
+ *
+ * The browser can't reliably call /v1/artists directly with the user's OAuth
+ * token (Spotify returns 403). The route uses a Client Credentials token
+ * (app-level) which has no such restriction.
+ *
+ * @param artistIds - Unique Spotify artist IDs
+ * @returns Map of artistId → string[] of genres
+ */
+async function fetchArtistGenres(
+  artistIds: string[],
+): Promise<Map<string, string[]>> {
+  const genreMap = new Map<string, string[]>();
+
+  try {
+    const { data } = await axios.post<Record<string, string[]>>(
+      "/api/spotify/artist-genres",
+      { ids: artistIds },
+    );
+    for (const [id, genres] of Object.entries(data)) {
+      genreMap.set(id, genres);
+    }
+  } catch (err) {
+    // Non-fatal: if genre lookup fails entirely, filtering will fall back to era-only
+    console.warn("Artist genre fetch failed:", err);
+  }
+
+  return genreMap;
+}
+
+/**
+ * Returns the release year as a number from a Spotify release_date string.
+ * Handles "YYYY-MM-DD", "YYYY-MM", and "YYYY" formats.
+ */
+function releaseYear(releaseDate: string): number {
+  return parseInt(releaseDate.slice(0, 4), 10);
+}
+
+/**
+ * Filters a list of saved tracks down to those that match the parsed prompt settings.
+ *
+ * Matching rules (all applicable filters must pass):
+ * - Genre: at least one of the track's artists must have a Spotify genre that
+ *   contains (or is contained by) one of the requested genres. Case-insensitive.
+ *   If settings.genres is empty, the genre filter is skipped.
+ * - Era: the track's release year must fall inside at least one of the requested
+ *   decade ranges. If settings.era is empty, the era filter is skipped.
+ *
+ * @param tracks - Full saved track objects
+ * @param settings - Parsed prompt settings from the LLM
+ * @param limit - Max number of URIs to return
+ * @returns Up to `limit` matching track URIs, shuffled
+ */
+async function filterSavedTracksBySettings(
+  tracks: SpotifyTrack[],
+  settings: ParsedPromptSettings,
+  limit: number,
+): Promise<string[]> {
+  // Collect unique artist IDs across all tracks
+  const artistIds = [
+    ...new Set(tracks.flatMap((t) => t.artists.map((a) => a.id))),
+  ];
+
+  const genreMap =
+    artistIds.length > 0 ? await fetchArtistGenres(artistIds) : new Map<string, string[]>();
+
+  const requestedGenres = settings.genres.map((g) => g.toLowerCase());
+
+  // Build era year ranges for filtering: "1980s" → [1980, 1989]
+  const eraRanges: [number, number][] = settings.era.flatMap((era) => {
+    const range = ERA_YEAR_RANGES[era];
+    if (!range) return [];
+    const [start, end] = range.split("-").map(Number);
+    return [[start, end]];
+  });
+
+  const matched: SpotifyTrack[] = [];
+
+  for (const track of tracks) {
+    // --- Genre filter ---
+    if (requestedGenres.length > 0) {
+      const artistGenres = track.artists.flatMap(
+        (a) => genreMap.get(a.id) ?? [],
+      );
+      const genreMatches = requestedGenres.some((req) =>
+        artistGenres.some(
+          (ag) => ag.includes(req) || req.includes(ag),
+        ),
+      );
+      if (!genreMatches) continue;
+    }
+
+    // --- Era filter ---
+    if (eraRanges.length > 0) {
+      const year = releaseYear(track.album.release_date);
+      const eraMatches = eraRanges.some(([start, end]) => year >= start && year <= end);
+      if (!eraMatches) continue;
+    }
+
+    matched.push(track);
+  }
+
+  if (matched.length === 0) {
+    throw new Error(
+      "None of your saved songs match the requested genres/era. Try a different prompt or uncheck 'Build from saved songs'.",
+    );
+  }
+
+  // Shuffle matched tracks (Fisher-Yates)
+  for (let i = matched.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [matched[i], matched[j]] = [matched[j], matched[i]];
+  }
+
+  return matched.slice(0, limit).map((t) => t.uri);
 }
 
 /**
@@ -256,21 +372,44 @@ export async function addTracksToPlaylist(
 /**
  * Main entry point: builds the final list of track URIs for a new playlist.
  *
- * TWO MODES:
- * 1. includeSavedMusic = false → all tracks come from Spotify search
- * 2. includeSavedMusic = true  → 60% from user's liked songs, 40% from search
- *    - Saved tracks are shuffled randomly so the playlist isn't just the most recent likes
- *    - Duplicates between saved and searched tracks are removed
- *    - Over-fetches saved tracks (3x needed) so we have enough after dedup + shuffle
+ * THREE MODES:
+ * 1. includeSavedMusic=false, settings provided → search Spotify (existing behaviour)
+ * 2. includeSavedMusic=true,  settings provided → fetch ALL saved tracks, filter by
+ *    genre/era from settings, return up to totalTracks matching URIs
+ * 3. includeSavedMusic=true,  settings=null     → fetch ALL saved tracks, shuffle,
+ *    return up to totalTracks (no filter — user gave no prompt)
  *
- * @param settings - Parsed prompt settings from the LLM
- * @param includeSavedMusic - Whether to mix in the user's liked songs
- * @param totalTracks - Desired total number of tracks in the playlist
- * @returns Array of unique track URIs
+ * @param settings - Parsed prompt settings from the LLM, or null if no prompt was given
+ * @param totalTracks - Desired number of tracks in the playlist
+ * @param includeSavedMusic - Whether to source tracks from the user's library
+ * @returns Array of track URIs
  */
 export async function buildTrackList(
-  settings: ParsedPromptSettings,
+  settings: ParsedPromptSettings | null,
   totalTracks: number = 30,
+  includeSavedMusic: boolean = false,
 ): Promise<string[]> {
-  return searchTracks(settings, totalTracks);
+  if (!includeSavedMusic) {
+    // settings must be present when not using saved music (prompt is required in this path)
+    return searchTracks(settings!, totalTracks);
+  }
+
+  // Fetch every saved track (all pages)
+  const allSaved = await fetchAllSavedTracks();
+
+  if (allSaved.length === 0) {
+    throw new Error("Your Spotify library has no saved songs.");
+  }
+
+  // If the user provided a prompt, filter to only matching tracks
+  if (settings && (settings.genres.length > 0 || settings.era.length > 0)) {
+    return filterSavedTracksBySettings(allSaved, settings, totalTracks);
+  }
+
+  // No prompt (or no genre/era to filter on) — just shuffle and return
+  for (let i = allSaved.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allSaved[i], allSaved[j]] = [allSaved[j], allSaved[i]];
+  }
+  return allSaved.slice(0, totalTracks).map((t) => t.uri);
 }

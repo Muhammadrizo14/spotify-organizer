@@ -1,8 +1,8 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { ParsedPromptSettings } from "@/types/playlist";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -49,43 +49,48 @@ const CreatePlaylistForm = ({ className }: IProps) => {
     try {
       let trackUris: string[] = [];
 
-      // STEP 1: If user provided a prompt, parse it and find matching tracks
+      // STEP 1: If a prompt was given, parse it with the LLM regardless of the checkbox.
+      //         The settings are used either for Spotify search or for filtering saved tracks.
+      let settings: ParsedPromptSettings | null = null;
       if (data.prompt?.trim()) {
-        // Send the prompt to our API route which calls Groq LLM to extract
-        // structured settings (mood, genres, era, etc.)
         toast.info("Analyzing your prompt...");
         const res = await axios.post<ParsedPromptSettings>("/api/parse-prompt", {
           prompt: data.prompt,
         });
-        const settings: ParsedPromptSettings = res.data
-
-        // Use the parsed settings to search Spotify for matching tracks
-        // This calls searchTracks() and optionally getSavedTracks()
-        toast.info("Finding tracks...");
-
-
-        trackUris = await buildTrackList(settings, data.trackCount);
-
-        // STEP 2: Create the playlist on Spotify (initially empty)
-        toast.info("Creating playlist...");
-        const playlist = await createPlaylist({
-          name: data.name,
-          description: data.description,
-        });
-
-        // STEP 3: Add the found tracks to the playlist (if any)
-        if (trackUris.length > 0) {
-          toast.info(`Adding ${trackUris.length} tracks...`);
-          await addTracksToPlaylist(playlist.id, trackUris);
-        }
-
-        // STEP 4: Success! Show toast and redirect to home page
-        toast.success("Playlist created!", {
-          description: `"${data.name}"${trackUris.length > 0 ? ` with ${trackUris.length} tracks` : ""}.`,
-          richColors: true,
-        });
-        router.push("/");
+        settings = res.data;
       }
+
+      // STEP 2: Build the track list
+      if (data.includeSavedMusic) {
+        // Checkbox ON: scan the full saved library and filter to tracks matching the prompt.
+        // If no prompt was given, all saved tracks are eligible (shuffled).
+        toast.info("Scanning your saved tracks...");
+        trackUris = await buildTrackList(settings, data.trackCount, true);
+      } else if (settings) {
+        // Checkbox OFF + prompt: search Spotify for matching tracks
+        toast.info("Finding tracks...");
+        trackUris = await buildTrackList(settings, data.trackCount, false);
+      }
+
+      // Create the playlist on Spotify (initially empty)
+      toast.info("Creating playlist...");
+      const playlist = await createPlaylist({
+        name: data.name,
+        description: data.description,
+      });
+
+      // Add the found tracks to the playlist (if any)
+      if (trackUris.length > 0) {
+        toast.info(`Adding ${trackUris.length} tracks...`);
+        await addTracksToPlaylist(playlist.id, trackUris);
+      }
+
+      // Success! Show toast and redirect to home page
+      toast.success("Playlist created!", {
+        description: `"${data.name}"${trackUris.length > 0 ? ` with ${trackUris.length} tracks` : ""}.`,
+        richColors: true,
+      });
+      router.push("/");
     } catch (err: unknown) {
       // Extract a user-friendly error message from whatever went wrong
       let description = "Something went wrong, try again later.";
@@ -153,20 +158,20 @@ const CreatePlaylistForm = ({ className }: IProps) => {
         )}
       </div>
 
-      {/* Include saved music toggle — when ON, 60% of tracks come from liked songs,
-          40% from search. When OFF, all tracks come from Spotify search. */}
-      {/* <div className="flex items-center gap-3"> */}
-      {/*   <Switch */}
-      {/*     checked={watch("includeSavedMusic")} */}
-      {/*     onCheckedChange={(checked) => setValue("includeSavedMusic", checked)} */}
-      {/*   /> */}
-      {/*   <label className="text-sm"> */}
-      {/*     Include my saved music (60% liked songs, 40% new) */}
-      {/*   </label> */}
-      {/* </div> */}
+      {/* Include saved music — when ON, playlist will be built from the user's saved songs only */}
+      <div className="flex items-center gap-3">
+        <Checkbox
+          id="includeSavedMusic"
+          checked={watch("includeSavedMusic")}
+          onCheckedChange={(checked) => setValue("includeSavedMusic", !!checked)}
+        />
+        <label htmlFor="includeSavedMusic" className="text-sm cursor-pointer">
+          Build playlist from my saved songs
+        </label>
+      </div>
 
-      <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>
-        CREATE
+      <Button type="submit" disabled={isSubmitting}>
+        {isSubmitting ? "Creating..." : "CREATE"}
       </Button>
     </form>
   );

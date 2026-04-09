@@ -120,7 +120,6 @@ export default function Home() {
 
   return (
     <div className="max-w-[90%] mx-auto p-5">
-      <Header />
 
       {loading ? (
         <p className="pt-5 text-muted-foreground">Loading...</p>

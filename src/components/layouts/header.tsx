@@ -33,9 +33,9 @@ const Header = ({ isLoggedIn }: HeaderProps) => {
   };
 
   return (
-    <header className="flex items-center pb-10 justify-between">
+    <header className="max-w-[90%] w-full mx-auto p-5 flex items-center pb-10 justify-between">
       <Link className="text-2xl font-semibold" href="/">
-        Spotify orgonizer
+        Spotify organizer
       </Link>
       {loggedIn ? (
         <Button size="lg" variant="outline" onClick={handleLogout}>

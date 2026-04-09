@@ -20,6 +20,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { SPOTIFY_SEED_GENRES, VALID_MOODS, VALID_ERAS } from "@/app/create/constants";
 
 // ---- Groq client (uses OpenAI-compatible API) ----
 // Groq provides fast inference for open-source LLMs.
@@ -28,47 +29,6 @@ const groq = new OpenAI({
   apiKey: process.env.GROQ_API_KEY,          // set in .env.local
   baseURL: "https://api.groq.com/openai/v1",
 });
-
-// ---- Allowed values for validation ----
-
-// Moods the LLM should pick from. If it picks something else, we default to "energetic".
-const VALID_MOODS = [
-  "chill", "hype", "sad", "romantic", "angry",
-  "upbeat", "dark", "mellow", "energetic", "peaceful",
-] as const;
-
-// Decades used for year-range search queries. Must match ERA_YEAR_RANGES in spotify-tracks.service.ts.
-const VALID_ERAS = [
-  "1960s", "1970s", "1980s", "1990s", "2000s", "2010s", "2020s",
-] as const;
-
-// Official Spotify seed genre slugs. The LLM MUST return genres from this list.
-// Full list from: https://developer.spotify.com/documentation/web-api/reference/get-recommendation-genres
-// If the LLM returns something not in this list (e.g. "Classic Rock"), we try to normalize it
-// (e.g. "Classic Rock" → "classic-rock" → not in list → fuzzy match → no match → error).
-const SPOTIFY_SEED_GENRES = [
-  "acoustic", "afrobeat", "alt-rock", "alternative", "ambient", "anime",
-  "black-metal", "bluegrass", "blues", "bossanova", "brazil", "breakbeat",
-  "british", "cantopop", "chicago-house", "children", "chill", "classical",
-  "club", "comedy", "country", "dance", "dancehall", "death-metal",
-  "deep-house", "detroit-techno", "disco", "disney", "drum-and-bass", "dub",
-  "dubstep", "edm", "electro", "electronic", "emo", "folk", "forro", "french",
-  "funk", "garage", "german", "gospel", "goth", "grindcore", "groove",
-  "grunge", "guitar", "happy", "hard-rock", "hardcore", "hardstyle",
-  "heavy-metal", "hip-hop", "holidays", "honky-tonk", "house", "idm",
-  "indian", "indie", "indie-pop", "industrial", "iranian", "j-dance",
-  "j-idol", "j-pop", "j-rock", "jazz", "k-pop", "kids", "latin",
-  "latino", "malay", "mandopop", "metal", "metal-misc", "metalcore",
-  "minimal-techno", "movies", "mpb", "new-age", "new-release", "opera",
-  "pagode", "party", "philippines-opm", "piano", "pop", "pop-film",
-  "post-dubstep", "power-pop", "progressive-house", "psych-rock", "punk",
-  "punk-rock", "r-n-b", "rainy-day", "reggae", "reggaeton", "road-trip",
-  "rock", "rock-n-roll", "rockabilly", "romance", "sad", "salsa", "samba",
-  "sertanejo", "show-tunes", "singer-songwriter", "ska", "sleep",
-  "songwriter", "soul", "soundtracks", "spanish", "study", "summer",
-  "swedish", "synth-pop", "tango", "techno", "trance", "trip-hop",
-  "turkish", "work-out", "world-music",
-] as const;
 
 // ---- System prompt sent to the LLM ----
 // This tells the LLM exactly what JSON shape to return and what values are valid.

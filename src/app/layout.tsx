@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
-import { Toaster } from "@/components/ui/sonner"
-const dmSans = DM_Sans({subsets:['latin'],variable:'--font-sans'});
+import { Toaster } from "@/components/ui/sonner";
+import ConditionalHeader from "@/components/layouts/conditional-header";
+import Footer from "@/components/layouts/footer";
+const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -28,10 +30,14 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn("font-sans", dmSans.variable)}>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased flex flex-col min-h-screen`}
       >
-        {children}        
+        <ConditionalHeader />
+        <main className="flex-1">
+          {children}
+        </main>
         <Toaster />
+        <Footer />
       </body>
     </html>
   );

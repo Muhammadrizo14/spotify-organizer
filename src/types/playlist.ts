@@ -16,11 +16,12 @@ export interface CreatePlaylistResponse {
   external_urls: { spotify: string };      // link to view the playlist on Spotify
 }
 
-// ---- Single track object from Spotify search results ----
+// ---- Single track object from Spotify search/library results ----
 export interface SpotifyTrack {
   uri: string;                             // e.g. "spotify:track:abc123" — the identifier used to add tracks
   name: string;
-  artists: { name: string }[];
+  artists: { id: string; name: string }[];
+  album: { release_date: string };         // e.g. "1985-06-23" or "1985"
 }
 
 // ---- Spotify /v1/search response (when type=track) ----
@@ -35,4 +36,9 @@ export interface SpotifyLibraryResponse {
   items: { track: SpotifyTrack }[];        // each item wraps a track
   next: string | null;                     // URL for next page, or null if last page
   total: number;                           // total saved tracks in user's library
+}
+
+// ---- Spotify /v1/artists?ids=... batch response ----
+export interface SpotifyArtistsResponse {
+  artists: { id: string; genres: string[] }[];
 }
