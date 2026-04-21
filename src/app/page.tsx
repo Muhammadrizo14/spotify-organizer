@@ -51,8 +51,8 @@ interface SpotifyPlaylist {
   collaborative: boolean;
   public: boolean | null;
   snapshot_id: string;
-  items: {
-    total: number;         // number of tracks in the playlist
+  tracks: {
+    total: number;
   };
   owner: {
     display_name: string | null;
@@ -76,44 +76,49 @@ export default function Home() {
 
   // Fetch user profile and playlists on page load
   useEffect(() => {
+    let active = true;
+
     const fetchData = async () => {
-      // getValidToken() handles token refresh automatically
       const token = await getValidToken();
 
-      // No token → user is not logged in
       if (!token) {
-        setLoading(false);
+        if (active) setLoading(false);
         return;
       }
 
       const headers = { Authorization: `Bearer ${token}` };
 
       try {
-        // Fetch profile and playlists in parallel for faster loading
         const [userRes, playlistsRes] = await Promise.all([
-          axios.get<SpotifyUserProfile>("https://api.spotify.com/v1/me", {
-            headers,
-          }),
+          axios.get<SpotifyUserProfile>("https://api.spotify.com/v1/me", { headers }),
           axios.get<SpotifyPlaylistsResponse>(
             "https://api.spotify.com/v1/me/playlists?limit=50",
             { headers },
           ),
         ]);
 
-        setUser(userRes.data);
-        setPlaylists(playlistsRes.data.items);
-      } catch {
-        // If fetching fails (e.g. token was invalid despite refresh), clear tokens
-        // so the user sees the login screen instead of a broken state
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("refresh_token");
-        localStorage.removeItem("token_expiry");
+        if (active) {
+          setUser(userRes.data);
+          setPlaylists(playlistsRes.data.items);
+        }
+      } catch (err) {
+        if (!active) return;
+        // Only clear tokens on a definitive 401 — transient errors (network,
+        // rate-limit, 5xx) should not log the user out.
+        const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+        if (status === 401) {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("refresh_token");
+          localStorage.removeItem("token_expiry");
+        }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchData();
+
+    return () => { active = false; };
   }, []);
 
 
@@ -171,7 +176,7 @@ export default function Home() {
                   </CardHeader>
                   <CardContent className="-mt-2">
                     <p className="text-sm text-muted-foreground">
-                      {playlist.items.total} tracks
+                      {playlist.tracks.total} tracks
                     </p>
                   </CardContent>
                 </Card>
