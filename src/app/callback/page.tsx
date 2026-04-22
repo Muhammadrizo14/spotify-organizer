@@ -60,7 +60,7 @@ const CallbackContent = () => {
     const getToken = async () => {
       await axios.post<TokenIssueResponse>("/api/spotify/token", { code })
         .then((res) => {
-          if (res.data.refresh_token === undefined) {
+            if (res.data.refresh_token === undefined) {
             throw new Error("Spotify did not return a refresh token.");
           }
 

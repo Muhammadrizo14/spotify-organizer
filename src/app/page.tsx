@@ -1,8 +1,7 @@
 "use client";
 
-import Header from "@/components/layouts/header";
 import axios from "axios";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getValidToken } from "@/lib/spotify-auth";
 import { LinkButton } from "@/components/ui/link-button";
@@ -73,9 +72,15 @@ export default function Home() {
   const [user, setUser] = useState<SpotifyUserProfile | null>(null);
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
   const [loading, setLoading] = useState(true);
+  const fetchStarted = useRef(false);
 
   // Fetch user profile and playlists on page load
   useEffect(() => {
+    // Guard against React Strict Mode's double-invocation of effects, which
+    // would fire two concurrent Spotify API requests with the same token.
+    if (fetchStarted.current) return;
+    fetchStarted.current = true;
+
     let active = true;
 
     const fetchData = async () => {
@@ -90,11 +95,8 @@ export default function Home() {
 
       try {
         const [userRes, playlistsRes] = await Promise.all([
-          axios.get<SpotifyUserProfile>("https://api.spotify.com/v1/me", { headers }),
-          axios.get<SpotifyPlaylistsResponse>(
-            "https://api.spotify.com/v1/me/playlists?limit=50",
-            { headers },
-          ),
+          axios.get<SpotifyUserProfile>("/api/spotify/me", { headers }),
+          axios.get<SpotifyPlaylistsResponse>("/api/spotify/playlists", { headers }),
         ]);
 
         if (active) {
@@ -103,12 +105,12 @@ export default function Home() {
         }
       } catch (err) {
         if (!active) return;
-        // Only clear tokens on a definitive 401 — transient errors (network,
-        // rate-limit, 5xx) should not log the user out.
         const status = axios.isAxiosError(err) ? err.response?.status : undefined;
         if (status === 401) {
+          // Only clear the access token — keep the refresh token so getValidToken()
+          // can attempt a silent refresh on the next visit instead of forcing a
+          // full re-login immediately.
           localStorage.removeItem("access_token");
-          localStorage.removeItem("refresh_token");
           localStorage.removeItem("token_expiry");
         }
       } finally {
@@ -176,7 +178,7 @@ export default function Home() {
                   </CardHeader>
                   <CardContent className="-mt-2">
                     <p className="text-sm text-muted-foreground">
-                      {playlist.tracks.total} tracks
+                      {playlist?.tracks?.total} tracks
                     </p>
                   </CardContent>
                 </Card>

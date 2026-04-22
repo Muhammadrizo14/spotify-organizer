@@ -1,0 +1,35 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "Spotify organizer" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - button "Logout" [ref=e4]
+  - main [ref=e5]:
+    - generic [ref=e6]:
+      - heading "Create new Playlist" [level=1] [ref=e7]
+      - generic [ref=e8]:
+        - tablist [ref=e9]:
+          - tab "AI" [selected] [ref=e10] [cursor=pointer]
+          - tab "Custom Filters" [ref=e11] [cursor=pointer]
+        - tabpanel "AI" [ref=e12]:
+          - generic [ref=e13]:
+            - textbox "Playlist name" [ref=e15]
+            - textbox "Description (optional)" [ref=e16]
+            - textbox "Describe your playlist — e.g. \"upbeat 80s rock for a road trip\"" [ref=e17]
+            - generic [ref=e18]:
+              - generic [ref=e19]: Number of tracks (10–50)
+              - spinbutton [ref=e20]: "20"
+            - generic [ref=e21]:
+              - checkbox "Build playlist from my saved songs" [ref=e22]
+              - checkbox
+              - generic [ref=e23] [cursor=pointer]: Build playlist from my saved songs
+            - button "CREATE" [ref=e24]
+  - region "Notifications alt+T"
+  - contentinfo [ref=e25]:
+    - paragraph [ref=e26]:
+      - text: Made with love by
+      - link "ubuntuous" [ref=e27] [cursor=pointer]:
+        - /url: https://github.com/Muhammadrizo14
+      - text: ❤️
+  - button "Open Next.js Dev Tools" [ref=e33] [cursor=pointer]:
+    - img [ref=e34]
+  - alert [ref=e37]

@@ -1,0 +1,20 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - link "Spotify organizer" [ref=e3] [cursor=pointer]:
+      - /url: /
+    - link "Login with Spotify" [ref=e4] [cursor=pointer]:
+      - /url: /api/spotify/login
+      - img
+      - text: Login with Spotify
+  - main [ref=e5]:
+    - paragraph [ref=e7]: Log in with Spotify to see your playlists.
+  - region "Notifications alt+T"
+  - contentinfo [ref=e8]:
+    - paragraph [ref=e9]:
+      - text: Made with love by
+      - link "ubuntuous" [ref=e10] [cursor=pointer]:
+        - /url: https://github.com/Muhammadrizo14
+      - text: ❤️
+  - button "Open Next.js Dev Tools" [ref=e16] [cursor=pointer]:
+    - img [ref=e17]
+  - alert [ref=e20]
