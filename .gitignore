@@ -42,3 +42,4 @@ next-env.d.ts
 
 certificates
 task.md
+.playwright-mcp/
