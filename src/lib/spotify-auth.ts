@@ -29,13 +29,13 @@ export async function getValidToken(): Promise<string | null> {
   const refreshToken = localStorage.getItem(REFRESH_KEY);
   const expiry = localStorage.getItem(EXPIRY_KEY);
 
-  if (!accessToken || !refreshToken) return null;
+  if (!refreshToken) return null;
 
   const expiryTime = expiry ? parseInt(expiry, 10) : 0;
   const fiveMinutes = 5 * 60 * 1000;
-  const needsRefresh = !expiry || Date.now() >= expiryTime - fiveMinutes;
+  const needsRefresh = !accessToken || !expiry || Date.now() >= expiryTime - fiveMinutes;
 
-  if (!needsRefresh) return accessToken;
+  if (!needsRefresh) return accessToken!;
 
   try {
     const res = await axios.post<TokenIssueResponse>("/api/spotify/refresh", {

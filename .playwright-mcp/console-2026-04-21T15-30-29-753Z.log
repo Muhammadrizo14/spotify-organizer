@@ -1,0 +1,14 @@
+[      71ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[     112ms] [LOG] [Fast Refresh] done in 141ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[     230ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[     265ms] [LOG] [HMR] connected @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[     523ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://api.spotify.com/v1/me/playlists?limit=50:0
+[     576ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ https://api.spotify.com/v1/me:0
+[  204453ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[  204516ms] [LOG] [Fast Refresh] done in 136ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[  208972ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[  209047ms] [LOG] [Fast Refresh] done in 85ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[  214021ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[  214131ms] [LOG] [Fast Refresh] done in 186ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[  220515ms] [LOG] [Fast Refresh] rebuilding @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297
+[  220574ms] [LOG] [Fast Refresh] done in 134ms @ http://127.0.0.1:3000/_next/static/chunks/node_modules_next_dist_f3530cac._.js:2297

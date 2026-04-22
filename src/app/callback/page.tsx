@@ -14,7 +14,7 @@
 
 import axios, { AxiosError } from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { TokenIssueErrorResponse, TokenIssueResponse } from "./_lib/types";
 import { saveTokens } from "@/lib/spotify-auth";
 import { getSpotifyAuthUrl } from "@/lib/spotify-login";
@@ -47,18 +47,20 @@ const CallbackContent = () => {
 
   const [status, setStatus] = useState<Status>(initialErrorMessage ? "error" : "loading");
   const [errorMessage, setErrorMessage] = useState<string>(initialErrorMessage ?? "");
+  const exchangeStarted = useRef(false);
 
   useEffect(() => {
     const shouldRequestToken = typeof code === "string" && spotifyError === null;
 
-    if (shouldRequestToken === false) {
+    if (!shouldRequestToken || exchangeStarted.current) {
       return;
     }
+    exchangeStarted.current = true;
 
     const getToken = async () => {
       await axios.post<TokenIssueResponse>("/api/spotify/token", { code })
         .then((res) => {
-          if (res.data.refresh_token === undefined) {
+            if (res.data.refresh_token === undefined) {
             throw new Error("Spotify did not return a refresh token.");
           }
 
