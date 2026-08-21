@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/sonner";
 import ConditionalHeader from "@/components/layouts/conditional-header";
 import Footer from "@/components/layouts/footer";
+import PreviewLanding from "@/components/preview/preview-landing";
+import { isPreviewMode } from "@/lib/app-mode";
 const dmSans = DM_Sans({ subsets: ["latin"], variable: "--font-sans" });
 
 const geistSans = Geist({
@@ -34,7 +36,9 @@ export default function RootLayout({
       >
         <ConditionalHeader />
         <main className="flex-1">
-          {children}
+          {/* In preview mode no route renders: every URL shows the walkthrough
+              instead, so nothing in the app can talk to Spotify. */}
+          {isPreviewMode ? <PreviewLanding /> : children}
         </main>
         <Toaster />
         <Footer />

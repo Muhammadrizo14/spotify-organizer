@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { previewModeResponse } from "@/lib/preview-guard";
 
 export async function GET(request: NextRequest) {
+  const blocked = previewModeResponse();
+  if (blocked) return blocked;
+
   const token = request.headers.get("Authorization");
 
   if (!token) {

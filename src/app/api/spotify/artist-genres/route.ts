@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { previewModeResponse } from "@/lib/preview-guard";
 import { requestSpotifyToken } from "@/lib/spotify-server";
 
 const SPOTIFY_BASE = "https://api.spotify.com/v1";
@@ -31,6 +32,9 @@ async function getAppToken(): Promise<string> {
  * logged-in user's OAuth token, which caused 403s when called from the browser.
  */
 export async function POST(request: NextRequest) {
+  const blocked = previewModeResponse();
+  if (blocked) return blocked;
+
   try {
     const body = (await request.json()) as { ids?: string[] };
     const ids = body.ids ?? [];

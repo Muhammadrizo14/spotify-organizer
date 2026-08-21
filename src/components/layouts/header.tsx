@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { LinkButton } from "../ui/link-button";
 import { Button } from "../ui/button";
+import { Badge } from "../ui/badge";
 import Link from "next/link";
 import { getSpotifyAuthUrl } from "@/lib/spotify-login";
+import { isPreviewMode } from "@/lib/app-mode";
 
 const SpotifyIcon = () => (
   <svg viewBox="0 0 24 24" fill="currentColor" className="size-5">
@@ -37,7 +39,11 @@ const Header = ({ isLoggedIn }: HeaderProps) => {
       <Link className="text-2xl font-semibold" href="/">
         Spotify organizer
       </Link>
-      {loggedIn ? (
+      {/* Preview builds have no working auth, so the header carries a label
+          instead of a login button that could not succeed. */}
+      {isPreviewMode ? (
+        <Badge variant="outline">Preview</Badge>
+      ) : loggedIn ? (
         <Button size="lg" variant="outline" onClick={handleLogout}>
           Logout
         </Button>

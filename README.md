@@ -47,6 +47,7 @@ An AI-powered web app that creates Spotify playlists from natural language promp
    ```
 
    ```
+   NEXT_PUBLIC_APP_MODE=development   # "development" runs the app; anything else serves the preview
    NEXT_PUBLIC_APP_URL=http://127.0.0.1:3000
    NEXT_PUBLIC_CLIENT_ID=       # Spotify App Client ID
    SPOTIFY_CLIENT_SECRET=       # Spotify App Client Secret
@@ -62,6 +63,41 @@ An AI-powered web app that creates Spotify playlists from natural language promp
    ```
 
    Open [http://127.0.0.1:3000](http://127.0.0.1:3000) in your browser.
+
+## App mode: real app vs. preview
+
+Spotify's [Developer Policy](https://developer.spotify.com/policy) does not allow a
+hosted third-party service to organize a user's library on their behalf — an app may
+not "replicate or attempt to replace a core user experience of Spotify" (III.11), and
+without extended quota mode only accounts the developer has explicitly added may use
+the app at all. So the deployed build does not run the app: it serves a preview page
+with screenshots and that explanation, and every Spotify/LLM route answers 403.
+
+`NEXT_PUBLIC_APP_MODE` decides which build you get, falling back to `NODE_ENV` when
+it is unset:
+
+| Value | Result |
+| --- | --- |
+| `development` | The real app — login, playlist creation, all API routes live |
+| anything else, or unset | Preview only — every route renders `src/components/preview/preview-landing.tsx` and the API routes return 403 |
+
+It is a `NEXT_PUBLIC_*` variable, so it is inlined at build time: set it in the
+hosting provider's environment **before** the build, not after.
+
+The gate lives in three places, all reading `isPreviewMode` from `src/lib/app-mode.ts`:
+
+- `src/app/layout.tsx` — renders the preview instead of `children`, so no page component runs
+- `src/components/layouts/header.tsx` — swaps the Spotify login button for a "Preview" label
+- `src/lib/preview-guard.ts` — `previewModeResponse()` short-circuits every API route
+
+### Updating the preview screenshots
+
+Images live in `public/screenshots/` and are listed in
+`src/components/preview/screenshots.ts`. To add or refresh one, run the app locally
+with `NEXT_PUBLIC_APP_MODE=development`, capture the page, drop the file in that
+folder, and add an entry with its real pixel width and height. Visit `/preview` in
+development to check the result without switching modes.
+
 
 ## How It Works
 
