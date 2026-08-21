@@ -19,6 +19,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { previewModeResponse } from "@/lib/preview-guard";
 import OpenAI from "openai";
 import { SPOTIFY_SEED_GENRES, VALID_MOODS, VALID_ERAS } from "@/app/create/constants";
 
@@ -131,6 +132,9 @@ function extractError(error: unknown): string {
 // ---- Route handler ----
 
 export async function POST(req: NextRequest) {
+  const blocked = previewModeResponse();
+  if (blocked) return blocked;
+
   try {
     // Extract the prompt from the request body
     const { prompt } = await req.json();

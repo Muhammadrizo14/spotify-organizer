@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { previewModeResponse } from "@/lib/preview-guard";
 import {
   getSpotifyRedirectUri,
   requestSpotifyToken,
 } from "@/lib/spotify-server";
 
 export async function POST(request: NextRequest) {
+  const blocked = previewModeResponse();
+  if (blocked) return blocked;
+
   try {
     const { code } = (await request.json()) as { code?: string };
 

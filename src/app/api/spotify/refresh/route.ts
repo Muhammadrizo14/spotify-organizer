@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { previewModeResponse } from "@/lib/preview-guard";
 import { requestSpotifyToken } from "@/lib/spotify-server";
 
 export async function POST(request: NextRequest) {
+  const blocked = previewModeResponse();
+  if (blocked) return blocked;
+
   try {
     const { refreshToken } = (await request.json()) as { refreshToken?: string };
 
