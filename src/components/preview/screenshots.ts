@@ -4,14 +4,18 @@
  * Files live in `public/screenshots/`. To refresh them, run the app locally
  * with NEXT_PUBLIC_APP_MODE=development, take a screenshot of the page and
  * drop it in that folder, then add or update an entry here.
+ *
+ * Only the file metadata lives here — the caption and description are copy,
+ * so they live per language in `i18n.ts` under the same `id`.
  */
 
+export type PreviewScreenshotId = "create-ai" | "create-filters";
+
 export interface PreviewScreenshot {
+  /** Key into `PreviewCopy["screenshots"]` for the caption and description. */
+  id: PreviewScreenshotId;
   /** Path under `public/`. */
   src: string;
-  /** Rendered as the caption under the image, and as the alt text. */
-  title: string;
-  description: string;
   /** Intrinsic size of the file, used to reserve layout space. */
   width: number;
   height: number;
@@ -19,18 +23,14 @@ export interface PreviewScreenshot {
 
 export const PREVIEW_SCREENSHOTS: PreviewScreenshot[] = [
   {
+    id: "create-ai",
     src: "/screenshots/create-ai.png",
-    title: "Describe a playlist in plain language",
-    description:
-      "The AI tab turns a prompt like \"chill lo-fi beats for late night coding\" into concrete genres, era and energy settings, then builds the playlist from Spotify search or from your saved songs.",
     width: 1280,
     height: 620,
   },
   {
+    id: "create-filters",
     src: "/screenshots/create-filters.png",
-    title: "Or set the filters yourself",
-    description:
-      "Custom Filters exposes the same engine directly: up to five genres, mood, decades, tempo, energy and track count — no prompt in the middle.",
     width: 1280,
     height: 940,
   },
